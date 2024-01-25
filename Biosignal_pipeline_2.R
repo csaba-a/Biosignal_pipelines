@@ -18,6 +18,20 @@ load_biosignal_data <- function(file_path) {
 
 # Function for biosignal data preprocessing
 preprocess_biosignal_data <- function(data) {
+  # Remove duplicate rows
+  data <- distinct(data)
+  
+  # Handle missing values
+  data <- na.omit(data)
+  
+  # Encode categorical variables
+  data$label <- as.factor(data$label)
+  
+  return(data)
+}
+
+# Function for biosignal data cleaning and filtering
+clean_and_filter_biosignal_data <- function(data) {
   # Example: Remove outliers using the interquartile range (IQR)
   calculate_iqr <- function(x) {
     q3 <- quantile(x, 0.75)
@@ -38,15 +52,25 @@ preprocess_biosignal_data <- function(data) {
   # Impute missing values using median
   data <- na.omit(data)  # Remove rows with missing values
   
-  # Encode categorical variables
-  data$label <- as.factor(data$label)
+  # Butterworth bandpass filter example
+  bandpass_filter <- function(signal, low_cutoff, high_cutoff, sampling_rate) {
+    nyquist <- sampling_rate / 2
+    filter_order <- 4
+    filter_coef <- butter(filter_order, c(low_cutoff, high_cutoff) / nyquist, type = "band")
+    filtered_signal <- filtfilt(filter_coef, signal)
+    return(filtered_signal)
+  }
+  
+  # Apply bandpass filter to specific signals
+  data$filtered_signal1 <- bandpass_filter(data$signal1, 0.5, 50, 1000)
+  data$filtered_signal2 <- bandpass_filter(data$signal2, 0.5, 50, 1000)
   
   return(data)
 }
 
 # Function for biosignal data visualization
 visualize_biosignal_data <- function(data) {
-  # Example: Advanced plots for biosignal data
+  # Advanced plots for biosignal data
   p1 <- ggplot(data, aes(x = timestamp, y = signal1, color = label)) +
     geom_line() +
     labs(title = "Time Series Plot of Signal 1 by Label")
@@ -60,23 +84,6 @@ visualize_biosignal_data <- function(data) {
   
   # Save combined plot
   ggsave("combined_plot.png", plot = combined_plot, device = "png")
-}
-
-# Function for biosignal signal processing
-process_biosignal_data <- function(data) {
-  # Example: Butterworth bandpass filter
-  bandpass_filter <- function(signal, low_cutoff, high_cutoff, sampling_rate) {
-    nyquist <- sampling_rate / 2
-    filter_order <- 4
-    filter_coef <- butter(filter_order, c(low_cutoff, high_cutoff) / nyquist, type = "band")
-    filtered_signal <- filtfilt(filter_coef, signal)
-    return(filtered_signal)
-  }
-  
-  # Apply bandpass filter to signal1
-  data$filtered_signal1 <- bandpass_filter(data$signal1, 0.5, 50, 1000)
-  
-  return(data)
 }
 
 # Function for biosignal feature extraction
@@ -110,20 +117,20 @@ biosignal_data <- load_biosignal_data("your_data.csv")
 # Preprocess biosignal data
 preprocessed_data <- preprocess_biosignal_data(biosignal_data)
 
-# Visualize biosignal data
-visualize_biosignal_data(preprocessed_data)
+# Clean and filter biosignal data
+cleaned_data <- clean_and_filter_biosignal_data(preprocessed_data)
 
-# Process biosignal data
-processed_data <- process_biosignal_data(preprocessed_data)
+# Visualize biosignal data
+visualize_biosignal_data(cleaned_data)
 
 # Feature extraction
-features <- extract_biosignal_features(processed_data)
+features <- extract_biosignal_features(cleaned_data)
 
 # Split data for training and testing
 set.seed(123)
-train_index <- createDataPartition(processed_data$label, p = 0.8, list = FALSE)
-train_data <- processed_data[train_index, ]
-test_data <- processed_data[-train_index, ]
+train_index <- createDataPartition(cleaned_data$label, p = 0.8, list = FALSE)
+train_data <- cleaned_data[train_index, ]
+test_data <- cleaned_data[-train_index, ]
 
 # Random Forest Classification
 predictions <- random_forest_classification(train_data, test_data)
